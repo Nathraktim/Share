@@ -9,32 +9,37 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 const port = 3000;
+
+const uploadsDir = path.resolve(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
 const upload = multer({
     storage: multer.diskStorage({
       destination: (req, file, cb) => {
-        cb(null, 'uploads/');
+        cb(null, uploadsDir);
       },
       filename: (req, file, cb) => {
         cb(null, file.originalname);
       }
     }),
     limits: { fileSize: Infinity }, // No file size limit
-});  
+});
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.resolve(__dirname, 'index.html'));
 });
 
 app.post('/upload', upload.single('file'), (req, res) => {
   res.send('File uploaded successfully');
 });
 
-// Handle Socket.io connections
 io.on('connection', (socket) => {
   console.log('New client connected');
 
   socket.on('requestFile', (filename, callback) => {
-    const filePath = path.join(__dirname, 'uploads', filename);
+    const filePath = path.resolve(uploadsDir, filename);
 
     if (fs.existsSync(filePath)) {
       fs.readFile(filePath, (err, data) => {
