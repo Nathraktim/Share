@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Form with Progress, Speed, Drag-and-Drop, and File Preview</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    #dropZone {
+      border: 2px dashed #4a90e2;
+      border-radius: 8px;
+      padding: 20px;
+      width: 300px;
+      margin: 20px auto;
+      text-align: center;
+      font-size: 16px;
+      color: #4a90e2;
+      background-color: #ffffff;
+      transition: background-color 0.3s, border-color 0.3s;
+      cursor: pointer;
+    }
+
+    #dropZone.hover {
+      border-color: #0066cc;
+      background-color: #eaf4ff;
+    }
+
+    form {
+      display: none;
+    }
+
+    button {
+      background-color: #4a90e2;
+      border: none;
+      border-radius: 5px;
+      color: #ffffff;
+      font-size: 16px;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      margin-top: 20px;
+    }
+
+    button:hover {
+      background-color: #357abd;
+    }
+
+    p {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+
+    #progressText {
+      color: #4caf50;
+    }
+
+    #speedText {
+      color: #f44336;
+    }
+
+   #fileCard {
+      display: none;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 10px;
+      width: 300px;
+      margin-top: 20px;
+      text-align: center;
+      background-color: #fff;
+    }
+
+    #fileCard img {
+      max-width: 100%;
+      max-height: 100px;
+      border-radius: 8px;
+    }
+
+    #fileCard .file-info {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #555;
+    }
+
+    #fileCard .icon {
+      font-size: 40px;
+      color: #4a90e2;
+    }
+
+    #fileCard .media-icon {
+      font-size: 40px;
+    }
+
+    #fileCard .media-icon.music {
+      color: #ff6f61;
+    }
+
+    #fileCard .media-icon.video {
+      color: #00bcd4;
+    }
+
+    #fileCard .media-icon.image {
+      color: #4caf50;
+    }
+  </style>
+</head>
+<body>
+  <h1>Upload a File</h1>
+  <div id="dropZone">Drag & Drop a file here or click to select</div>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" id="fileInput" name="file">
+  </form>
+  <button id="uploadButton" disabled>Upload File</button>
+  <p id="progressText">Progress: 0%</p>
+  <p id="speedText">Speed: 0 B/s</p>
+
+  <div id="fileCard">
+    <div id="fileIcon" class="icon"></div>
+    <img id="fileImage" src="" alt="File preview" style="display: none;">
+    <div class="file-info" id="fileName"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const progressText = document.getElementById('progressText');
+    const speedText = document.getElementById('speedText');
+    const uploadButton = document.getElementById('uploadButton');
+    const fileCard = document.getElementById('fileCard');
+    const fileNameDiv = document.getElementById('fileName');
+    const fileIconDiv = document.getElementById('fileIcon');
+    const fileImage = document.getElementById('fileImage');
+
+    // Handle drag over
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropZone.classList.add('hover');
+    });
+
+    // Handle drag leave
+    dropZone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      dropZone.classList.remove('hover');
+    });
+
+    // Handle drop
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropZone.classList.remove('hover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        fileInput.files = files; // Set the dropped files to the file input
+        updateFileCard(files[0]);
+        uploadButton.disabled = false; // Enable the upload button
+      }
+    });
+
+    // Handle file input change
+    fileInput.addEventListener('change', function(e) {
+      const files = e.target.files;
+      if (files.length > 0) {
+        updateFileCard(files[0]);
+        uploadButton.disabled = false; // Enable the upload button
+      }
+    });
+
+    // Handle drop zone click to open file dialog
+    dropZone.addEventListener('click', function() {
+      fileInput.click();
+    });
+
+    // Handle upload button click
+    uploadButton.addEventListener('click', function() {
+      const files = fileInput.files;
+      if (files.length > 0) {
+        uploadFile(files[0]); // Start the upload
+      }
+    });
+
+    function updateFileCard(file) {
+      fileCard.style.display = 'block';
+      fileNameDiv.textContent = file.name;
+
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+
+      if (file.type.startsWith('image/')) {
+        fileIconDiv.className = 'icon media-icon image';
+        fileIconDiv.innerHTML = '📷';
+        fileImage.style.display = 'block';
+        fileImage.src = URL.createObjectURL(file);
+      } else if (file.type.startsWith('video/')) {
+        fileIconDiv.className = 'icon media-icon video';
+        fileIconDiv.innerHTML = '🎥';
+        fileImage.style.display = 'none';
+      } else if (file.type.startsWith('audio/')) {
+        fileIconDiv.className = 'icon media-icon music';
+        fileIconDiv.innerHTML = '🎵';
+        fileImage.style.display = 'none';
+      } else {
+        fileIconDiv.className = 'icon';
+        fileIconDiv.innerHTML = '📄';
+        fileImage.style.display = 'none';
+      }
+    }
+
+    function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/upload', true);
+
+      let startTime = Date.now();
+
+      xhr.upload.onprogress = function(event) {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          progressText.textContent = `Progress: ${percentComplete.toFixed(2)}%`;
+
+          // Calculate upload speed
+          const elapsedTime = (Date.now() - startTime) / 1000; // Time in seconds
+          const speedBytes = event.loaded / elapsedTime; // Bytes per second
+
+          // Convert speed to an appropriate unit
+          let speed = speedBytes;
+          let unit = 'B/s';
+
+          if (speed > 1024) {
+            speed /= 1024;
+            unit = 'KB/s';
+          }
+          if (speed > 1024) {
+            speed /= 1024;
+            unit = 'MB/s';
+          }
+          if (unit === 'B/s' && speed > 125) { // 125 B/s = 1 Kb/s
+            speed = speedBytes * 8 / 1024; // Convert to Kilobits per second
+            unit = 'Kb/s';
+          }
+          if (unit === 'Kb/s' && speed > 1024) {
+            speed /= 1024;
+            unit = 'Mb/s';
+          }
+
+          speedText.textContent = `Speed: ${speed.toFixed(2)} ${unit}`;
+        }
+      };
+
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          progressText.textContent = 'Upload complete!';
+          speedText.textContent = 'Speed: 0 B/s';
+
+          // Hide file card after upload
+          fileCard.style.display = 'none';
+
+          // Hide "Upload complete!" message after 5 seconds
+          setTimeout(() => {
+            progressText.textContent = 'Progress: 0%';
+            speedText.textContent = 'Speed: 0 B/s';
+          }, 5000);
+        } else {
+          progressText.textContent = 'Upload failed.';
+        }
+        uploadButton.disabled = true; // Disable the upload button after upload
+      };
+
+      xhr.send(formData);
+    }
+  </script>
+</body>
+</html>
