@@ -9,7 +9,6 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 const port = 3000;
-
 const upload = multer({
     storage: multer.diskStorage({
       destination: (req, file, cb) => {
